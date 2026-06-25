@@ -18,7 +18,12 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/framework/cache/data
 /vendor
 Homestead.json
 Homestead.yaml
 Thumbs.db
+smart_order
+/docs
+/scripts
+#/storage/api-docs

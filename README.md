@@ -1,59 +1,293 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Smart Order System API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A RESTful API for order and payment management built with Laravel 12. Features JWT authentication, an extensible payment gateway system using the Strategy pattern, Swagger documentation, and a Controller → Service → Repository architecture.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Table of Contents
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- [Requirements](#requirements)
+- [Local Setup (without Docker)](#local-setup-without-docker)
+- [Docker Setup](#docker-setup)
+- [Running Tests](#running-tests)
+- [API Documentation (Swagger)](#api-documentation-swagger)
+- [Payment Gateway Extensibility](#payment-gateway-extensibility)
+- [API Overview](#api-overview)
+- [Assumptions & Notes](#assumptions--notes)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## Requirements
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+- PHP 8.2+
+- Composer
+- MySQL 8.0+
+- (Optional) Docker & Docker Compose
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+---
 
-## Laravel Sponsors
+## Local Setup (without Docker)
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```bash
+# 1. Clone the repository
+git clone <repository-url>
+cd smart-order-system
 
-### Premium Partners
+# 2. Install dependencies
+composer install
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+# 3. Copy environment file and configure
+cp .env.example .env
 
-## Contributing
+# Edit .env — set your MySQL credentials:
+# DB_DATABASE=smart_order
+# DB_USERNAME=root
+# DB_PASSWORD=your_password
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+# 4. Generate application key
+php artisan key:generate
 
-## Code of Conduct
+# 5. Generate JWT secret
+php artisan jwt:secret
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+# 6. Run migrations
+php artisan migrate
 
-## Security Vulnerabilities
+# 7. Start the development server
+php artisan serve
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+The API will be available at `http://localhost:8000/api`.
 
-## License
+---
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Docker Setup
+
+```bash
+# 1. Copy and configure environment
+cp .env.example .env
+
+# Set these values in .env for Docker:
+# DB_HOST=db
+# DB_DATABASE=smart_order
+# DB_USERNAME=laravel
+# DB_PASSWORD=secret
+
+# 2. Build and start containers
+docker compose up -d --build
+
+# 3. Generate application key and JWT secret
+docker compose exec app php artisan key:generate
+docker compose exec app php artisan jwt:secret
+
+# 4. Run migrations
+docker compose exec app php artisan migrate
+```
+
+The API will be available at `http://localhost:8090/api`.
+
+**Services:**
+
+| Service    | Container            | Port        |
+|------------|----------------------|-------------|
+| PHP-FPM    | `smart_order_app`    | internal    |
+| Nginx      | `smart_order_nginx`  | `8090:80`   |
+| MySQL 8.0  | `smart_order_db`     | `3307:3306` |
+
+---
+
+## Running Tests
+
+Tests use an in-memory SQLite database — no additional setup needed.
+
+```bash
+# Local
+php artisan test
+
+# Docker
+docker compose exec app php artisan test
+
+# Run only a specific suite
+php artisan test --testsuite=Unit
+php artisan test --testsuite=Feature
+```
+
+### API smoke test (curl)
+
+Requires a running server and `python3` on PATH:
+
+```bash
+# Against Docker (default)
+bash scripts/test-api.sh
+
+# Against a custom URL
+bash scripts/test-api.sh http://localhost:8000/api
+```
+
+The script registers a user, exercises every endpoint in a realistic flow (create → confirm → pay → delete guard), and prints a colour-coded pass/fail summary.
+
+**Test coverage:**
+
+| Suite   | File                    | What it tests                                        |
+|---------|-------------------------|------------------------------------------------------|
+| Unit    | `CreditCardGatewayTest` | Gateway name, reference format, response shape       |
+| Unit    | `PayPalGatewayTest`     | Gateway name, sandbox mode, response shape           |
+| Feature | `AuthTest`              | Register, login, logout, profile, bad credentials    |
+| Feature | `OrderTest`             | CRUD, total calculation, status filter, delete guard |
+| Feature | `PaymentTest`           | Process payment, confirmed-status guard, list, show  |
+
+---
+
+## API Documentation (Swagger)
+
+Generate the Swagger spec, then open the UI:
+
+```bash
+php artisan l5-swagger:generate
+```
+
+Swagger UI: **`http://localhost:8000/api/documentation`** (or `http://localhost:8090/api/documentation` with Docker)
+
+The raw JSON spec is served at `/api/docs`.
+
+---
+
+## Payment Gateway Extensibility
+
+The payment system uses the **Strategy Pattern** via `PaymentGatewayManager`. Adding a new gateway requires **three steps and zero changes to existing code**:
+
+### Step 1 — Implement the interface
+
+```php
+// app/Payments/Gateways/StripeGateway.php
+
+namespace App\Payments\Gateways;
+
+use App\Payments\Contracts\PaymentGatewayInterface;
+
+class StripeGateway implements PaymentGatewayInterface
+{
+    public function __construct(private readonly string $secretKey) {}
+
+    public function process(array $data): array
+    {
+        // Call the Stripe SDK here
+        $reference = 'ST-' . strtoupper(uniqid());
+
+        return [
+            'reference' => $reference,
+            'status'    => 'successful',
+            'raw'       => ['gateway' => $this->getName(), 'amount' => $data['amount']],
+        ];
+    }
+
+    public function getName(): string
+    {
+        return 'stripe';
+    }
+}
+```
+
+### Step 2 — Add credentials to config
+
+```php
+// config/services.php
+'stripe' => [
+    'secret_key' => env('STRIPE_SECRET_KEY'),
+],
+```
+
+```dotenv
+# .env
+STRIPE_SECRET_KEY=sk_test_...
+```
+
+### Step 3 — Register in AppServiceProvider
+
+```php
+// app/Providers/AppServiceProvider.php  →  boot()
+
+$this->app->bind(StripeGateway::class, fn () => new StripeGateway(
+    config('services.stripe.secret_key'),
+));
+
+$this->app->make(PaymentGatewayManager::class)->extend('stripe', StripeGateway::class);
+```
+
+The `stripe` method is now accepted by `POST /api/payments` automatically — `ProcessPaymentRequest` reads supported methods dynamically from the manager.
+
+---
+
+## API Overview
+
+All endpoints (except register and login) require:
+```
+Authorization: Bearer <token>
+```
+
+### Auth
+
+| Method | Endpoint             | Description               |
+|--------|----------------------|---------------------------|
+| POST   | `/api/auth/register` | Register a new user       |
+| POST   | `/api/auth/login`    | Login and receive a token |
+| POST   | `/api/auth/logout`   | Invalidate the token      |
+| POST   | `/api/auth/refresh`  | Refresh the token         |
+| GET    | `/api/auth/me`       | Get authenticated user    |
+
+### Orders
+
+| Method | Endpoint           | Description                            |
+|--------|--------------------|----------------------------------------|
+| GET    | `/api/orders`      | List orders (`?status=`, `?per_page=`) |
+| POST   | `/api/orders`      | Create order (items array required)    |
+| GET    | `/api/orders/{id}` | Show order with items and payments     |
+| PUT    | `/api/orders/{id}` | Update status or replace items         |
+| DELETE | `/api/orders/{id}` | Delete (fails if payments exist)       |
+
+### Payments
+
+| Method | Endpoint                    | Description                               |
+|--------|-----------------------------|-------------------------------------------|
+| GET    | `/api/payments`             | List all payments (`?per_page=`)          |
+| POST   | `/api/payments`             | Process payment (order must be confirmed) |
+| GET    | `/api/payments/{id}`        | Show payment detail                       |
+| GET    | `/api/orders/{id}/payments` | List payments for a specific order        |
+
+### Example: Create and pay for an order
+
+```bash
+# 1. Register
+curl -X POST http://localhost:8000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Alice","email":"alice@example.com","password":"password123","password_confirmation":"password123"}'
+
+# 2. Create an order
+curl -X POST http://localhost:8000/api/orders \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"items":[{"product_name":"Widget","quantity":2,"price":19.99}]}'
+
+# 3. Confirm the order
+curl -X PUT http://localhost:8000/api/orders/1 \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"confirmed"}'
+
+# 4. Process payment
+curl -X POST http://localhost:8000/api/payments \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"order_id":1,"payment_method":"credit_card"}'
+```
+
+---
+
+## Assumptions & Notes
+
+- **Payment simulation** — both `CreditCardGateway` and `PayPalGateway` simulate successful charges. Replace their `process()` methods with real SDK calls to go live.
+- **Order ownership** — `GET /orders` returns only the authenticated user's orders. The show/update/delete endpoints do not enforce ownership; add a policy if strict multi-tenant isolation is required.
+- **Payment status** — payments are always created as `successful` in simulation. A real gateway may return `failed`; the schema supports it.
+- **Pagination** — all list endpoints return Laravel's standard paginated response with `data`, `links`, and `meta` keys.
+- **Token expiry** — JWT TTL defaults to 60 minutes (configurable in `config/jwt.php` via `JWT_TTL`). Use `POST /auth/refresh` before expiry.
+- **Swagger generation** — run `php artisan l5-swagger:generate` after any annotation change. The output lands in `storage/api-docs/api-docs.json`.
